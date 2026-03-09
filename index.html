@@ -1,0 +1,2647 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>資産管理 | FORTUNA</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#c9a84c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FORTUNA">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Noto+Sans+JP:wght@300;400;500&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a28;
+    --border: #2a2a3d;
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --gold-dim: #7a6330;
+    --text: #e8e8f0;
+    --text-dim: #7a7a9a;
+    --text-muted: #4a4a6a;
+    --green: #4ecf8a;
+    --red: #ef5a6f;
+    --blue: #5a9ef0;
+    --purple: #9b7fe8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grain */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: 100vh;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  .logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.8rem;
+    font-weight: 300;
+    letter-spacing: 0.15em;
+    color: var(--gold);
+    text-align: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo span {
+    display: block;
+    font-size: 0.55rem;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.3em;
+    color: var(--text-muted);
+    margin-top: 0.3rem;
+    text-transform: uppercase;
+  }
+
+  .nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    flex: 1;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.7rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    transition: all 0.2s;
+    border: 1px solid transparent;
+  }
+
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active {
+    background: linear-gradient(135deg, rgba(201,168,76,0.1), rgba(201,168,76,0.05));
+    border-color: rgba(201,168,76,0.3);
+    color: var(--gold-light);
+  }
+
+  .nav-icon { font-size: 1rem; width: 1.2rem; text-align: center; }
+
+  .sidebar-total {
+    padding: 1rem;
+    background: linear-gradient(135deg, rgba(201,168,76,0.08), transparent);
+    border: 1px solid rgba(201,168,76,0.2);
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .sidebar-total .label {
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .sidebar-total .amount {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.5rem;
+    color: var(--gold);
+    margin-top: 0.3rem;
+  }
+
+  /* MAIN */
+  .main {
+    padding: 2rem 2.5rem;
+    overflow-y: auto;
+  }
+
+  .page { display: none; }
+  .page.active { display: block; animation: fadeIn 0.3s ease; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .page-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2rem;
+    font-weight: 300;
+    color: var(--gold-light);
+    margin-bottom: 0.3rem;
+    letter-spacing: 0.05em;
+  }
+
+  .page-sub {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.1em;
+    margin-bottom: 2rem;
+  }
+
+  /* CARDS */
+  .cards-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem 1.4rem;
+    transition: border-color 0.2s;
+  }
+
+  .card:hover { border-color: rgba(201,168,76,0.3); }
+
+  .card-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 0.5rem;
+  }
+
+  .card-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .card-badge {
+    display: inline-block;
+    margin-top: 0.4rem;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .badge-green { background: rgba(78,207,138,0.1); color: var(--green); }
+  .badge-red { background: rgba(239,90,111,0.1); color: var(--red); }
+  .badge-blue { background: rgba(90,158,240,0.1); color: var(--blue); }
+
+  /* CHARTS GRID */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+  }
+
+  .chart-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 1rem;
+  }
+
+  .chart-container { position: relative; height: 200px; }
+
+  /* ASSET TABLE */
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .section-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.2rem;
+    color: var(--gold-light);
+    letter-spacing: 0.05em;
+  }
+
+  .btn {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: 'Noto Sans JP', sans-serif;
+    transition: all 0.2s;
+  }
+
+  .btn-gold {
+    background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+    color: #0a0a0f;
+    font-weight: 500;
+  }
+
+  .btn-gold:hover { background: linear-gradient(135deg, var(--gold-light), var(--gold)); }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover { border-color: var(--gold-dim); color: var(--gold-light); }
+
+  .btn-danger {
+    background: rgba(239,90,111,0.1);
+    color: var(--red);
+    border: 1px solid rgba(239,90,111,0.2);
+  }
+
+  .btn-danger:hover { background: rgba(239,90,111,0.2); }
+
+  .asset-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+
+  .asset-table th {
+    text-align: left;
+    padding: 0.6rem 1rem;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+  }
+
+  .asset-table td {
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid rgba(42,42,61,0.5);
+    vertical-align: middle;
+  }
+
+  .asset-table tr:last-child td { border-bottom: none; }
+
+  .asset-table tbody tr {
+    transition: background 0.15s;
+    cursor: default;
+  }
+
+  .asset-table tbody tr:hover { background: var(--surface2); }
+
+  .asset-type-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 3px;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .type-cash { background: rgba(90,158,240,0.12); color: var(--blue); }
+  .type-stock { background: rgba(78,207,138,0.12); color: var(--green); }
+  .type-crypto { background: rgba(155,127,232,0.12); color: var(--purple); }
+
+  .amount-cell {
+    font-family: 'DM Mono', monospace;
+    text-align: right;
+  }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem;
+    width: 440px;
+    max-width: 95vw;
+    animation: slideUp 0.25s ease;
+  }
+
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .modal-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.4rem;
+    color: var(--gold-light);
+    margin-bottom: 1.5rem;
+    letter-spacing: 0.05em;
+  }
+
+  .form-group { margin-bottom: 1.1rem; }
+
+  .form-label {
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 0.4rem;
+  }
+
+  .form-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.65rem 0.9rem;
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .form-input:focus { border-color: var(--gold-dim); }
+
+  .form-input option { background: var(--surface); }
+
+  .modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+  }
+
+  /* INCOME/EXPENSE */
+  .ie-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .ie-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+  }
+
+  .ie-card.income-card { border-top: 2px solid var(--green); }
+  .ie-card.expense-card { border-top: 2px solid var(--red); }
+
+  .ie-total {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.8rem;
+    margin: 0.5rem 0 1rem;
+  }
+
+  .ie-total.income { color: var(--green); }
+  .ie-total.expense { color: var(--red); }
+
+  .transaction-list { display: flex; flex-direction: column; gap: 0.6rem; }
+
+  .transaction-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 0.8rem;
+    background: var(--bg);
+    border-radius: 6px;
+    font-size: 0.82rem;
+  }
+
+  .tx-name { color: var(--text-dim); }
+  .tx-amount { font-family: 'DM Mono', monospace; }
+  .tx-date { font-size: 0.7rem; color: var(--text-muted); }
+
+  /* GOALS */
+  .goals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .goal-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+  }
+
+  .goal-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem;
+    color: var(--gold-light);
+    margin-bottom: 0.3rem;
+  }
+
+  .goal-target {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 1rem;
+  }
+
+  .goal-progress-bar {
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+  }
+
+  .goal-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  .goal-pct {
+    font-size: 0.75rem;
+    color: var(--gold);
+    font-family: 'DM Mono', monospace;
+    text-align: right;
+  }
+
+  .goal-current {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.3rem;
+    margin-top: 0.5rem;
+    color: var(--text);
+  }
+
+  .goal-deadline {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.3rem;
+  }
+
+  /* TABS */
+  .tabs { display: flex; gap: 0.3rem; margin-bottom: 1.5rem; }
+
+  .tab {
+    padding: 0.5rem 1.1rem;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    transition: all 0.2s;
+    border: 1px solid transparent;
+  }
+
+  .tab:hover { background: var(--surface2); }
+  .tab.active {
+    background: rgba(201,168,76,0.1);
+    border-color: rgba(201,168,76,0.3);
+    color: var(--gold-light);
+  }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 1.5rem 0;
+  }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  /* Net */
+  .net-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: var(--surface2);
+    border-radius: 8px;
+    margin-top: 1rem;
+  }
+
+  .net-label { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--text-muted); letter-spacing: 0.1em; }
+  .net-value { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; }
+
+  /* ===== MOBILE BOTTOM NAV ===== */
+  .bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    z-index: 50;
+    padding: 0.5rem 0 calc(0.5rem + env(safe-area-inset-bottom));
+  }
+
+  .bottom-nav-inner {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+  }
+
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.4rem 1rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: color 0.2s;
+    font-size: 0.6rem;
+    letter-spacing: 0.05em;
+    flex: 1;
+  }
+
+  .bottom-nav-item .bn-icon { font-size: 1.2rem; line-height: 1; }
+  .bottom-nav-item.active { color: var(--gold); }
+
+  /* Mobile header */
+  .mobile-header {
+    display: none;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 1.2rem 0.8rem;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+  }
+
+  .mobile-logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.3rem;
+    color: var(--gold);
+    letter-spacing: 0.15em;
+  }
+
+  .mobile-total {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--gold-light);
+    text-align: right;
+  }
+
+  .mobile-total-label {
+    font-size: 0.55rem;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.1rem;
+  }
+
+  /* ===== RESPONSIVE BREAKPOINTS ===== */
+  @media (max-width: 768px) {
+    /* Hide desktop sidebar, show mobile UI */
+    .sidebar { display: none; }
+    .mobile-header { display: flex; }
+    .bottom-nav { display: block; }
+
+    .app {
+      grid-template-columns: 1fr;
+      min-height: 100vh;
+    }
+
+    .main {
+      padding: 1rem 1rem 5rem; /* bottom padding for nav */
+    }
+
+    .page-title { font-size: 1.4rem; }
+    .page-sub { font-size: 0.65rem; margin-bottom: 1.2rem; }
+
+    /* Cards — 2 columns on mobile */
+    .cards-row {
+      grid-template-columns: 1fr 1fr;
+      gap: 0.7rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .card { padding: 0.9rem 1rem; }
+    .card-value { font-size: 1.2rem; }
+    .card-label { font-size: 0.6rem; }
+
+    /* Charts — stack on mobile */
+    .charts-grid {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .chart-container { height: 180px; }
+
+    /* Income/expense — stack */
+    .ie-grid {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    /* Goals — single column */
+    .goals-grid {
+      grid-template-columns: 1fr;
+    }
+
+    /* Asset table — hide yield column, compact */
+    .asset-table .hide-mobile { display: none; }
+    .asset-table th, .asset-table td { padding: 0.7rem 0.6rem; font-size: 0.78rem; }
+
+    /* Tabs — scrollable */
+    .tabs { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 0.3rem; }
+    .tab { white-space: nowrap; font-size: 0.75rem; padding: 0.4rem 0.8rem; }
+
+    /* Modal — full width on mobile */
+    .modal {
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      border-radius: 16px 16px 0 0;
+      padding: 1.5rem 1.2rem;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+    }
+
+    .modal-overlay {
+      align-items: flex-end;
+    }
+
+    /* Larger touch targets */
+    .btn { padding: 0.6rem 1rem; font-size: 0.85rem; }
+    .form-input { font-size: 1rem; padding: 0.75rem 0.9rem; } /* prevent iOS zoom */
+
+    /* Net row */
+    .net-row { padding: 0.8rem 1rem; }
+
+    /* Section header */
+    .section-header { margin-bottom: 0.8rem; }
+  }
+
+  @media (max-width: 400px) {
+    .cards-row { grid-template-columns: 1fr; }
+    .card-value { font-size: 1.3rem; }
+  }
+
+  /* ===== IMPORT PAGE ===== */
+  .import-upload-area {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    background: var(--surface);
+    margin-bottom: 1.5rem;
+  }
+
+  .import-upload-area:hover, .import-upload-area.drag-over {
+    border-color: var(--gold-dim);
+    background: rgba(201,168,76,0.04);
+  }
+
+  .import-upload-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.8rem;
+    color: var(--gold-dim);
+  }
+
+  .import-upload-title {
+    font-size: 1rem;
+    color: var(--text);
+    margin-bottom: 0.4rem;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.2rem;
+  }
+
+  .import-upload-sub {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.1em;
+    margin-bottom: 1.2rem;
+  }
+
+  .import-upload-types {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .type-pill {
+    padding: 0.25rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .import-status {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .import-status-icon {
+    font-size: 1.8rem;
+    color: var(--gold);
+    animation: spin 1.2s linear infinite;
+  }
+
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .import-status-icon.done { animation: none; }
+
+  .import-status-title { font-size: 0.95rem; color: var(--text); margin-bottom: 0.2rem; }
+  .import-status-sub { font-size: 0.75rem; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+
+  .import-preview-header { margin-bottom: 1.2rem; }
+
+  .import-section-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    color: var(--gold-dim);
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+  }
+
+  .import-checklist {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .import-check-item {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.85rem 1.1rem;
+    border-bottom: 1px solid rgba(42,42,61,0.5);
+    transition: background 0.15s;
+  }
+
+  .import-check-item:last-child { border-bottom: none; }
+  .import-check-item:hover { background: var(--surface2); }
+
+  .import-check-item input[type="checkbox"] {
+    width: 16px; height: 16px;
+    accent-color: var(--gold);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .import-item-info { flex: 1; min-width: 0; }
+  .import-item-name { font-size: 0.88rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .import-item-meta { font-size: 0.68rem; color: var(--text-muted); font-family: 'DM Mono', monospace; margin-top: 0.15rem; }
+  .import-item-amount { font-family: 'DM Mono', monospace; font-size: 0.88rem; white-space: nowrap; }
+  .import-item-badge { flex-shrink: 0; }
+
+  .import-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .import-guide {
+    margin-top: 2rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+  }
+
+  .import-guide-title {
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 1.2rem;
+  }
+
+  .import-guide-steps { display: flex; flex-direction: column; gap: 1rem; }
+
+  .guide-step {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .guide-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--gold-dim);
+    letter-spacing: 0.1em;
+    padding-top: 0.1rem;
+    flex-shrink: 0;
+    width: 2rem;
+  }
+
+  .guide-label { font-size: 0.88rem; color: var(--text); margin-bottom: 0.2rem; }
+  .guide-desc { font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; }
+
+  .import-privacy-note {
+    margin-top: 1.2rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.73rem;
+    color: var(--text-muted);
+  }
+
+  @media (max-width: 768px) {
+    .import-upload-area { padding: 2rem 1rem; }
+    .import-upload-types { gap: 0.3rem; }
+    .import-actions { flex-direction: column; }
+    .import-actions .btn { width: 100%; text-align: center; }
+  }
+
+  /* ===== API KEY PANEL ===== */
+  .apikey-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--gold-dim);
+    border-radius: 10px;
+    padding: 1.2rem 1.4rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .apikey-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .apikey-desc {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-top: 0.2rem;
+  }
+
+  .apikey-badge {
+    font-size: 0.62rem;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.1em;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .apikey-badge-unset { background: rgba(239,90,111,0.12); color: var(--red); }
+  .apikey-badge-set   { background: rgba(78,207,138,0.12); color: var(--green); }
+
+  .apikey-input-row {
+    display: flex;
+    gap: 0.7rem;
+    align-items: center;
+  }
+
+  .apikey-hint {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.4rem;
+  }
+
+  .apikey-saved-row {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 500px) {
+    .apikey-input-row { flex-direction: column; }
+    .apikey-input-row .btn, .apikey-input-row .form-input { width: 100%; }
+    .apikey-saved-row { flex-direction: column; align-items: flex-start; }
+  }
+
+  /* ===== SYNC PAGE ===== */
+  .sync-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.4rem;
+  }
+
+  .sync-tab {
+    flex: 1;
+    text-align: center;
+    padding: 0.7rem 1rem;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .sync-tab:hover { background: var(--surface2); }
+  .sync-tab.active {
+    background: linear-gradient(135deg, rgba(201,168,76,0.15), rgba(201,168,76,0.05));
+    color: var(--gold-light);
+    border: 1px solid rgba(201,168,76,0.3);
+  }
+
+  .sync-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.4rem;
+    margin-bottom: 1.2rem;
+  }
+
+  .sync-card-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem;
+    color: var(--gold-light);
+    margin-bottom: 0.4rem;
+  }
+
+  .sync-card-desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 0.5rem;
+  }
+
+  .sync-options {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+  }
+
+  .sync-option {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+
+  .sync-option input { accent-color: var(--gold); }
+
+  .sync-merge-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.8rem;
+  }
+
+  .sync-qr-area {
+    background: var(--surface);
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: 10px;
+    padding: 1.4rem;
+    text-align: center;
+    margin-bottom: 1.2rem;
+  }
+
+  .sync-qr-title {
+    font-size: 0.85rem;
+    color: var(--text);
+    margin-bottom: 0.3rem;
+  }
+
+  .sync-qr-warn {
+    font-size: 0.7rem;
+    color: var(--red);
+    background: rgba(239,90,111,0.08);
+    border-radius: 6px;
+    padding: 0.5rem 0.8rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .sync-data-size {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .sync-error {
+    background: rgba(239,90,111,0.06);
+    border: 1px solid rgba(239,90,111,0.2);
+    border-radius: 10px;
+    padding: 1.4rem;
+    text-align: center;
+    margin-bottom: 1.2rem;
+  }
+
+  .sync-error-title { font-size: 0.95rem; color: var(--red); margin-bottom: 0.3rem; }
+  .sync-error-desc  { font-size: 0.78rem; color: var(--text-muted); line-height: 1.6; }
+
+  .sync-guide {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.4rem;
+    margin-top: 1rem;
+  }
+
+  .sync-guide-steps { display: flex; flex-direction: column; gap: 1rem; }
+
+  /* QRコードのスタイル */
+  #sync-qr-canvas canvas {
+    border-radius: 8px;
+    border: 6px solid white;
+  }
+
+  @media (max-width: 768px) {
+    .sync-tabs { flex-direction: column; }
+    .sync-options { flex-direction: column; gap: 0.5rem; }
+  }
+
+  /* ===== COST PANEL ===== */
+  .cost-panel {
+    background: var(--surface);
+    border: 1px solid rgba(201,168,76,0.25);
+    border-radius: 10px;
+    padding: 1rem 1.3rem;
+    margin-bottom: 1.2rem;
+  }
+
+  .cost-panel-row {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .cost-item {
+    flex: 1;
+    text-align: center;
+  }
+
+  .cost-item-total {
+    flex: 1.4;
+    background: rgba(201,168,76,0.06);
+    border-radius: 7px;
+    padding: 0.5rem;
+  }
+
+  .cost-label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 0.25rem;
+  }
+
+  .cost-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.88rem;
+    color: var(--text);
+  }
+
+  .cost-total-val { color: var(--gold-light); font-size: 0.95rem; }
+
+  .cost-yen {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    margin-top: 0.1rem;
+  }
+
+  .cost-divider {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    flex-shrink: 0;
+  }
+
+  .cost-cumulative {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.72rem;
+  }
+
+  .cost-cum-label {
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    flex: 1;
+  }
+
+  .cost-cum-val {
+    font-family: 'DM Mono', monospace;
+    color: var(--gold);
+    font-size: 0.8rem;
+  }
+
+  .cost-cum-yen {
+    font-family: 'DM Mono', monospace;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+  }
+
+  @media (max-width: 500px) {
+    .cost-panel-row { gap: 0.4rem; }
+    .cost-value { font-size: 0.75rem; }
+    .cost-divider { font-size: 0.75rem; }
+  }
+</style>
+</head>
+<body>
+<!-- MOBILE HEADER -->
+<header class="mobile-header">
+  <div class="mobile-logo">FORTUNA</div>
+  <div class="mobile-total">
+    <div class="mobile-total-label">総資産</div>
+    <div id="mobile-total-amount">¥0</div>
+  </div>
+</header>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="logo">
+      FORTUNA
+      <span>資産管理システム</span>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" onclick="navigate('dashboard')">
+        <span class="nav-icon">◆</span> ダッシュボード
+      </div>
+      <div class="nav-item" onclick="navigate('assets')">
+        <span class="nav-icon">◈</span> 資産一覧
+      </div>
+      <div class="nav-item" onclick="navigate('income')">
+        <span class="nav-icon">◉</span> 収支記録
+      </div>
+      <div class="nav-item" onclick="navigate('goals')">
+        <span class="nav-icon">◎</span> 目標設定
+      </div>
+      <div class="nav-item" onclick="navigate('import')" style="margin-top:auto">
+        <span class="nav-icon">⬆</span> AIインポート
+      </div>
+      <div class="nav-item" onclick="navigate('sync')">
+        <span class="nav-icon">⇄</span> デバイス同期
+      </div>
+    </nav>
+    <div class="sidebar-total">
+      <div class="label">総資産</div>
+      <div class="amount" id="sidebar-total">¥0</div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-title">ダッシュボード</div>
+      <div class="page-sub">// OVERVIEW · PORTFOLIO SUMMARY</div>
+
+      <div class="cards-row">
+        <div class="card">
+          <div class="card-label">現金・預金</div>
+          <div class="card-value" id="dash-cash">¥0</div>
+          <div class="card-badge badge-blue" id="dash-cash-pct">0%</div>
+        </div>
+        <div class="card">
+          <div class="card-label">株式・投資信託</div>
+          <div class="card-value" id="dash-stock">¥0</div>
+          <div class="card-badge badge-green" id="dash-stock-pct">0%</div>
+        </div>
+        <div class="card">
+          <div class="card-label">仮想通貨</div>
+          <div class="card-value" id="dash-crypto">¥0</div>
+          <div class="card-badge badge-blue" id="dash-crypto-pct" style="background:rgba(155,127,232,0.1);color:#9b7fe8">0%</div>
+        </div>
+        <div class="card">
+          <div class="card-label">今月の収支</div>
+          <div class="card-value" id="dash-net">¥0</div>
+          <div class="card-badge" id="dash-net-badge">—</div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">// 資産配分</div>
+          <div class="chart-container">
+            <canvas id="donutChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">// 月別収支推移</div>
+          <div class="chart-container">
+            <canvas id="lineChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">// 資産カテゴリ別バー</div>
+        <div class="chart-container">
+          <canvas id="barChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ASSETS -->
+    <div class="page" id="page-assets">
+      <div class="page-title">資産一覧</div>
+      <div class="page-sub">// ASSET REGISTRY</div>
+
+      <div class="tabs">
+        <div class="tab active" onclick="filterAssets('all', this)">すべて</div>
+        <div class="tab" onclick="filterAssets('cash', this)">現金・預金</div>
+        <div class="tab" onclick="filterAssets('stock', this)">株式・投資信託</div>
+        <div class="tab" onclick="filterAssets('crypto', this)">仮想通貨</div>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">保有資産</div>
+        <button class="btn btn-gold" onclick="openAssetModal()">＋ 資産を追加</button>
+      </div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <table class="asset-table">
+          <thead>
+            <tr>
+              <th>資産名</th>
+              <th>種別</th>
+              <th style="text-align:right">金額</th>
+              <th style="text-align:right" class="hide-mobile">利回り</th>
+              <th style="text-align:center">操作</th>
+            </tr>
+          </thead>
+          <tbody id="asset-tbody">
+            <tr><td colspan="5" class="empty-state">資産データがありません<br>「＋ 資産を追加」から登録してください</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- INCOME/EXPENSE -->
+    <div class="page" id="page-income">
+      <div class="page-title">収支記録</div>
+      <div class="page-sub">// INCOME & EXPENSE TRACKER</div>
+
+      <div class="ie-grid">
+        <div class="ie-card income-card">
+          <div class="card-label">今月の収入合計</div>
+          <div class="ie-total income" id="income-total">¥0</div>
+          <div class="section-header" style="margin-bottom:0.8rem">
+            <div style="font-size:0.8rem;color:var(--text-dim)">収入</div>
+            <button class="btn btn-ghost" style="font-size:0.75rem;padding:0.35rem 0.7rem" onclick="openTxModal('income')">＋ 追加</button>
+          </div>
+          <div class="transaction-list" id="income-list">
+            <div class="empty-state" style="padding:1rem">記録なし</div>
+          </div>
+        </div>
+        <div class="ie-card expense-card">
+          <div class="card-label">今月の支出合計</div>
+          <div class="ie-total expense" id="expense-total">¥0</div>
+          <div class="section-header" style="margin-bottom:0.8rem">
+            <div style="font-size:0.8rem;color:var(--text-dim)">支出</div>
+            <button class="btn btn-ghost" style="font-size:0.75rem;padding:0.35rem 0.7rem" onclick="openTxModal('expense')">＋ 追加</button>
+          </div>
+          <div class="transaction-list" id="expense-list">
+            <div class="empty-state" style="padding:1rem">記録なし</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="net-row">
+        <div class="net-label">今月の純収支</div>
+        <div class="net-value" id="net-total" style="color:var(--green)">¥0</div>
+      </div>
+    </div>
+
+    <!-- GOALS -->
+    <div class="page" id="page-goals">
+      <div class="page-title">目標設定</div>
+      <div class="page-sub">// FINANCIAL GOALS</div>
+
+      <div class="section-header">
+        <div class="section-title">目標一覧</div>
+        <button class="btn btn-gold" onclick="openGoalModal()">＋ 目標を追加</button>
+      </div>
+
+      <div class="goals-grid" id="goals-grid">
+        <div class="empty-state" style="grid-column:1/-1">目標がありません<br>「＋ 目標を追加」から設定してください</div>
+      </div>
+    </div>
+    <!-- IMPORT PAGE -->
+    <div class="page" id="page-import">
+      <div class="page-title">AIインポート</div>
+      <div class="page-sub">// AI-POWERED DATA IMPORT</div>
+
+      <!-- APIキー設定パネル -->
+      <div class="apikey-panel" id="apikey-panel">
+        <div class="apikey-header">
+          <div>
+            <div class="chart-title" style="margin-bottom:0.25rem">🔐 Anthropic APIキー</div>
+            <div class="apikey-desc">入力したキーはこのデバイスのみに一時保存されます（アプリを閉じると消えます）。ファイルには一切記録されません。</div>
+          </div>
+          <span class="apikey-badge apikey-badge-unset" id="apikey-badge">未設定</span>
+        </div>
+
+        <!-- 未設定時: 入力フォーム -->
+        <div id="apikey-form">
+          <div class="apikey-input-row">
+            <input class="form-input" id="apikey-input" type="password"
+              placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false"
+              style="font-family:'DM Mono',monospace;font-size:0.82rem;flex:1"
+              onkeydown="if(event.key==='Enter') saveApiKey()">
+            <button class="btn btn-gold" onclick="saveApiKey()">保存</button>
+          </div>
+          <div class="apikey-hint">
+            キーは <a href="https://console.anthropic.com" target="_blank" style="color:var(--gold-light)">console.anthropic.com</a> で取得できます
+          </div>
+        </div>
+
+        <!-- 設定済み時 -->
+        <div id="apikey-saved" style="display:none" class="apikey-saved-row">
+          <span style="font-size:0.82rem;color:var(--green)">✓ セッションに保存済み（アプリを閉じると消えます）</span>
+          <div style="display:flex;gap:0.5rem;margin-left:auto">
+            <button class="btn btn-ghost" onclick="editApiKey()" style="font-size:0.72rem;padding:0.3rem 0.7rem">変更</button>
+            <button class="btn btn-danger" onclick="clearApiKey()" style="font-size:0.72rem;padding:0.3rem 0.7rem">削除</button>
+          </div>
+        </div>
+      </div>
+      <div class="import-upload-area" id="import-drop-zone" onclick="document.getElementById('import-file-input').click()">
+        <div class="import-upload-icon">⬆</div>
+        <div class="import-upload-title">ファイルをドロップ、またはクリックして選択</div>
+        <div class="import-upload-sub">対応形式: PDF · CSV · PNG · JPG</div>
+        <div class="import-upload-types">
+          <span class="type-pill">通帳明細</span>
+          <span class="type-pill">銀行明細</span>
+          <span class="type-pill">証券レポート</span>
+          <span class="type-pill">クレジット履歴</span>
+        </div>
+        <input type="file" id="import-file-input" accept=".pdf,.csv,.png,.jpg,.jpeg" style="display:none" onchange="handleFileSelect(event)">
+      </div>
+
+      <!-- AI processing status -->
+      <div class="import-status" id="import-status" style="display:none">
+        <div class="import-status-icon" id="import-status-icon">⟳</div>
+        <div>
+          <div class="import-status-title" id="import-status-title">AIが解析中...</div>
+          <div class="import-status-sub" id="import-status-sub">ファイルを読み取っています</div>
+        </div>
+      </div>
+
+      <!-- Cost display (shown after each API call) -->
+      <div class="cost-panel" id="cost-panel" style="display:none">
+        <div class="cost-panel-row">
+          <div class="cost-item">
+            <div class="cost-label">入力トークン</div>
+            <div class="cost-value" id="cost-input-tokens">—</div>
+          </div>
+          <div class="cost-divider">+</div>
+          <div class="cost-item">
+            <div class="cost-label">出力トークン</div>
+            <div class="cost-value" id="cost-output-tokens">—</div>
+          </div>
+          <div class="cost-divider">=</div>
+          <div class="cost-item cost-item-total">
+            <div class="cost-label">今回のコスト</div>
+            <div class="cost-value cost-total-val" id="cost-this-call">$0.000000</div>
+            <div class="cost-yen" id="cost-this-call-yen">≈ ¥0</div>
+          </div>
+        </div>
+        <div class="cost-cumulative">
+          <span class="cost-cum-label">累計コスト（今セッション）</span>
+          <span class="cost-cum-val" id="cost-cumulative">$0.000000</span>
+          <span class="cost-cum-yen" id="cost-cumulative-yen">≈ ¥0</span>
+        </div>
+      </div>
+
+      <!-- Preview / confirm -->
+      <div id="import-preview" style="display:none">
+        <div class="import-preview-header">
+          <div class="section-title">📋 AIが読み取ったデータ — 確認してください</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.3rem">不要な行のチェックを外すと取り込まれません</div>
+        </div>
+
+        <div id="import-preview-assets" style="display:none">
+          <div class="import-section-label">▸ 資産データ</div>
+          <div id="import-assets-list" class="import-checklist"></div>
+        </div>
+
+        <div id="import-preview-transactions" style="display:none;margin-top:1.2rem">
+          <div class="import-section-label">▸ 収支データ</div>
+          <div id="import-tx-list" class="import-checklist"></div>
+        </div>
+
+        <div class="import-actions">
+          <button class="btn btn-ghost" onclick="resetImport()">キャンセル</button>
+          <button class="btn btn-gold" onclick="confirmImport()">✓ 選択したデータを取り込む</button>
+        </div>
+      </div>
+
+      <!-- Guide -->
+      <div class="import-guide" id="import-guide">
+        <div class="import-guide-title">// 使い方</div>
+        <div class="import-guide-steps">
+          <div class="guide-step">
+            <div class="guide-num">01</div>
+            <div>
+              <div class="guide-label">ファイルをアップロード</div>
+              <div class="guide-desc">通帳スキャン・銀行PDF・証券明細CSV・クレカ履歴など</div>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-num">02</div>
+            <div>
+              <div class="guide-label">AIが自動解析</div>
+              <div class="guide-desc">Claude AIが金額・日付・種別・名称を自動で読み取ります</div>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-num">03</div>
+            <div>
+              <div class="guide-label">確認して取り込む</div>
+              <div class="guide-desc">読み取り結果を確認し、不要なデータを除いて一括登録</div>
+            </div>
+          </div>
+        </div>
+        <div class="import-privacy-note">
+          🔒 ファイルはAI解析のためのみ使用され、サーバーには保存されません
+        </div>
+      </div>
+    </div>
+    <!-- SYNC PAGE -->
+    <div class="page" id="page-sync">
+      <div class="page-title">デバイス同期</div>
+      <div class="page-sub">// QR CODE SYNC · NO SERVER REQUIRED</div>
+
+      <div class="sync-tabs">
+        <div class="sync-tab active" id="stab-send" onclick="switchSyncTab('send')">
+          <span>📤</span> このデバイスから送る
+        </div>
+        <div class="sync-tab" id="stab-recv" onclick="switchSyncTab('recv')">
+          <span>📥</span> 別のデバイスで受け取る
+        </div>
+      </div>
+
+      <!-- SEND TAB -->
+      <div id="sync-send">
+        <div class="sync-card">
+          <div class="sync-card-title">QRコードを生成</div>
+          <div class="sync-card-desc">このデバイスの全データをQRコードに変換します。別のデバイスのカメラで読み取ってください。</div>
+
+          <div class="sync-options">
+            <label class="sync-option">
+              <input type="checkbox" id="sync-assets" checked> 資産データ
+            </label>
+            <label class="sync-option">
+              <input type="checkbox" id="sync-transactions" checked> 収支記録
+            </label>
+            <label class="sync-option">
+              <input type="checkbox" id="sync-goals" checked> 目標設定
+            </label>
+          </div>
+
+          <button class="btn btn-gold" onclick="generateQR()" style="width:100%;margin-top:1rem">
+            QRコードを生成
+          </button>
+        </div>
+
+        <!-- QR表示エリア -->
+        <div class="sync-qr-area" id="sync-qr-area" style="display:none">
+          <div class="sync-qr-title">スマホのカメラで読み取ってください</div>
+          <div id="sync-qr-canvas" style="display:flex;justify-content:center;margin:1.2rem 0"></div>
+          <div class="sync-qr-warn">⚠️ このQRには資産データが含まれます。公共の場では注意してください。</div>
+          <div class="sync-data-size" id="sync-data-size"></div>
+          <button class="btn btn-ghost" onclick="document.getElementById('sync-qr-area').style.display='none'" style="width:100%;margin-top:0.8rem">
+            閉じる
+          </button>
+        </div>
+
+        <!-- データ大きすぎエラー -->
+        <div class="sync-error" id="sync-size-error" style="display:none">
+          <div style="font-size:1.2rem;margin-bottom:0.5rem">⚠️</div>
+          <div class="sync-error-title">データが大きすぎます</div>
+          <div class="sync-error-desc">QRコードに収まるデータ量を超えています。エクスポート機能をお使いください（近日追加予定）。</div>
+        </div>
+      </div>
+
+      <!-- RECEIVE TAB -->
+      <div id="sync-recv" style="display:none">
+        <div class="sync-card">
+          <div class="sync-card-title">URLからデータを受け取る</div>
+          <div class="sync-card-desc">QRコードを読み取ると自動でこのページが開きます。または送られたURLをそのまま貼り付けてください。</div>
+
+          <div class="form-group" style="margin-top:1rem">
+            <label class="form-label">同期URL</label>
+            <textarea class="form-input" id="sync-url-input" rows="3"
+              placeholder="fortuna://sync?d=..." style="resize:vertical;font-family:'DM Mono',monospace;font-size:0.75rem"></textarea>
+          </div>
+          <button class="btn btn-gold" onclick="importFromUrl()" style="width:100%">
+            データを読み込む
+          </button>
+        </div>
+
+        <!-- 受信プレビュー -->
+        <div id="sync-recv-preview" style="display:none;margin-top:1.2rem">
+          <div class="sync-card">
+            <div class="sync-card-title">📋 受信したデータ — 確認</div>
+            <div id="sync-recv-summary" style="margin:0.8rem 0;font-size:0.82rem;color:var(--text-dim)"></div>
+            <div class="sync-merge-options">
+              <label class="sync-option">
+                <input type="radio" name="merge-mode" value="merge" checked> 既存データに追加（マージ）
+              </label>
+              <label class="sync-option">
+                <input type="radio" name="merge-mode" value="replace"> 既存データを置き換え
+              </label>
+            </div>
+            <div style="display:flex;gap:0.7rem;margin-top:1rem">
+              <button class="btn btn-ghost" onclick="cancelRecv()" style="flex:1">キャンセル</button>
+              <button class="btn btn-gold" onclick="applyRecv()" style="flex:1">取り込む</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 使い方ガイド -->
+      <div class="sync-guide">
+        <div class="chart-title" style="margin-bottom:1rem">// 使い方</div>
+        <div class="sync-guide-steps">
+          <div class="guide-step">
+            <div class="guide-num">01</div>
+            <div>
+              <div class="guide-label">送る側：QRコードを生成</div>
+              <div class="guide-desc">「このデバイスから送る」タブでQRコードを生成します</div>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-num">02</div>
+            <div>
+              <div class="guide-label">受け取る側：カメラで読み取る</div>
+              <div class="guide-desc">スマホのカメラアプリでQRを読み取ると自動でアプリが開きます</div>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-num">03</div>
+            <div>
+              <div class="guide-label">確認して取り込む</div>
+              <div class="guide-desc">マージ（追加）か置き換えを選んで取り込み完了</div>
+            </div>
+          </div>
+        </div>
+        <div class="import-privacy-note">
+          🔒 データはQRコード内に直接埋め込まれます。外部サーバーは一切使いません。
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- PWA INSTALL BANNER -->
+<div id="pwa-install-banner" style="display:none;position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:200;background:#12121a;border:1px solid #c9a84c;border-radius:12px;padding:0.9rem 1.2rem;display:none;align-items:center;gap:1rem;box-shadow:0 8px 32px rgba(0,0,0,0.5);max-width:340px;width:90%;">
+  <img src="icons/icon-192.png" style="width:36px;height:36px;border-radius:8px;">
+  <div style="flex:1">
+    <div style="font-size:0.85rem;color:#e8e8f0;margin-bottom:0.1rem">FORTUNAをインストール</div>
+    <div style="font-size:0.7rem;color:#4a4a6a;font-family:monospace">ホーム画面に追加してオフラインで使用</div>
+  </div>
+  <button onclick="installPWA()" style="background:linear-gradient(135deg,#c9a84c,#7a6330);border:none;color:#0a0a0f;padding:0.4rem 0.9rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:500;white-space:nowrap">インストール</button>
+  <button onclick="dismissInstallBanner()" style="background:none;border:none;color:#4a4a6a;cursor:pointer;font-size:1.1rem;padding:0.2rem">✕</button>
+</div>
+
+<!-- BOTTOM NAV (mobile) -->
+<nav class="bottom-nav">
+  <div class="bottom-nav-inner">
+    <div class="bottom-nav-item active" id="bn-dashboard" onclick="navigate('dashboard')">
+      <span class="bn-icon">◆</span>
+      <span>ホーム</span>
+    </div>
+    <div class="bottom-nav-item" id="bn-assets" onclick="navigate('assets')">
+      <span class="bn-icon">◈</span>
+      <span>資産</span>
+    </div>
+    <div class="bottom-nav-item" id="bn-income" onclick="navigate('income')">
+      <span class="bn-icon">◉</span>
+      <span>収支</span>
+    </div>
+    <div class="bottom-nav-item" id="bn-goals" onclick="navigate('goals')">
+      <span class="bn-icon">◎</span>
+      <span>目標</span>
+    </div>
+    <div class="bottom-nav-item" id="bn-import" onclick="navigate('import')">
+      <span class="bn-icon">⬆</span>
+      <span>読込</span>
+    </div>
+    <div class="bottom-nav-item" id="bn-sync" onclick="navigate('sync')">
+      <span class="bn-icon">⇄</span>
+      <span>同期</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ASSET MODAL -->
+<div class="modal-overlay" id="asset-modal">
+  <div class="modal">
+    <div class="modal-title" id="asset-modal-title">資産を追加</div>
+    <div class="form-group">
+      <label class="form-label">資産名</label>
+      <input class="form-input" id="asset-name" type="text" placeholder="例: 普通預金、トヨタ株、Bitcoin">
+    </div>
+    <div class="form-group">
+      <label class="form-label">種別</label>
+      <select class="form-input" id="asset-type">
+        <option value="cash">現金・預金</option>
+        <option value="stock">株式・投資信託</option>
+        <option value="crypto">仮想通貨</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">金額（円）</label>
+      <input class="form-input" id="asset-amount" type="number" placeholder="1000000" min="0">
+    </div>
+    <div class="form-group">
+      <label class="form-label">利回り（%）</label>
+      <input class="form-input" id="asset-yield" type="number" placeholder="3.5" step="0.1">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('asset-modal')">キャンセル</button>
+      <button class="btn btn-gold" onclick="saveAsset()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- TRANSACTION MODAL -->
+<div class="modal-overlay" id="tx-modal">
+  <div class="modal">
+    <div class="modal-title" id="tx-modal-title">収入を追加</div>
+    <div class="form-group">
+      <label class="form-label">内容</label>
+      <input class="form-input" id="tx-name" type="text" placeholder="例: 給与、副業収入">
+    </div>
+    <div class="form-group">
+      <label class="form-label">金額（円）</label>
+      <input class="form-input" id="tx-amount" type="number" placeholder="300000" min="0">
+    </div>
+    <div class="form-group">
+      <label class="form-label">日付</label>
+      <input class="form-input" id="tx-date" type="date">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('tx-modal')">キャンセル</button>
+      <button class="btn btn-gold" onclick="saveTx()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- GOAL MODAL -->
+<div class="modal-overlay" id="goal-modal">
+  <div class="modal">
+    <div class="modal-title">目標を設定</div>
+    <div class="form-group">
+      <label class="form-label">目標名</label>
+      <input class="form-input" id="goal-name" type="text" placeholder="例: 老後資金、住宅購入">
+    </div>
+    <div class="form-group">
+      <label class="form-label">目標金額（円）</label>
+      <input class="form-input" id="goal-target" type="number" placeholder="10000000" min="0">
+    </div>
+    <div class="form-group">
+      <label class="form-label">現在の達成額（円）</label>
+      <input class="form-input" id="goal-current" type="number" placeholder="3000000" min="0">
+    </div>
+    <div class="form-group">
+      <label class="form-label">達成期限</label>
+      <input class="form-input" id="goal-deadline" type="date">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('goal-modal')">キャンセル</button>
+      <button class="btn btn-gold" onclick="saveGoal()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+let state = {
+  assets: [],
+  transactions: [],
+  goals: [],
+  editingAsset: null,
+  txType: 'income'
+};
+
+// Load from localStorage
+function loadState() {
+  try {
+    const saved = localStorage.getItem('fortuna_state');
+    if (saved) state = { ...state, ...JSON.parse(saved) };
+  } catch(e) {}
+}
+
+function saveState() {
+  try { localStorage.setItem('fortuna_state', JSON.stringify(state)); } catch(e) {}
+}
+
+// ===== NAVIGATION =====
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.bottom-nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  const navItems = document.querySelectorAll('.nav-item');
+  const map = { dashboard: 0, assets: 1, income: 2, goals: 3, import: 4, sync: 5 };
+  navItems[map[page]].classList.add('active');
+  const bn = document.getElementById('bn-' + page);
+  if (bn) bn.classList.add('active');
+  if (page === 'dashboard') renderCharts();
+  window.scrollTo(0, 0);
+}
+
+// ===== FORMAT =====
+function fmt(n) {
+  return '¥' + Math.round(n).toLocaleString('ja-JP');
+}
+
+function typeLabel(t) {
+  return { cash: '現金・預金', stock: '株式・投資信託', crypto: '仮想通貨' }[t] || t;
+}
+
+function typeBadgeClass(t) {
+  return { cash: 'type-cash', stock: 'type-stock', crypto: 'type-crypto' }[t] || '';
+}
+
+// ===== TOTALS =====
+function getTotals() {
+  const cash = state.assets.filter(a => a.type === 'cash').reduce((s, a) => s + a.amount, 0);
+  const stock = state.assets.filter(a => a.type === 'stock').reduce((s, a) => s + a.amount, 0);
+  const crypto = state.assets.filter(a => a.type === 'crypto').reduce((s, a) => s + a.amount, 0);
+  const total = cash + stock + crypto;
+  const incomes = state.transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const expenses = state.transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  return { cash, stock, crypto, total, incomes, expenses };
+}
+
+// ===== UPDATE UI =====
+function updateAll() {
+  const { cash, stock, crypto, total, incomes, expenses } = getTotals();
+  const net = incomes - expenses;
+
+  // Sidebar + mobile header
+  document.getElementById('sidebar-total').textContent = fmt(total);
+  const mobileAmt = document.getElementById('mobile-total-amount');
+  if (mobileAmt) mobileAmt.textContent = fmt(total);
+
+  // Dashboard cards
+  document.getElementById('dash-cash').textContent = fmt(cash);
+  document.getElementById('dash-stock').textContent = fmt(stock);
+  document.getElementById('dash-crypto').textContent = fmt(crypto);
+  document.getElementById('dash-net').textContent = fmt(net);
+
+  document.getElementById('dash-cash-pct').textContent = total ? (cash / total * 100).toFixed(1) + '%' : '0%';
+  document.getElementById('dash-stock-pct').textContent = total ? (stock / total * 100).toFixed(1) + '%' : '0%';
+  document.getElementById('dash-crypto-pct').textContent = total ? (crypto / total * 100).toFixed(1) + '%' : '0%';
+
+  const nb = document.getElementById('dash-net-badge');
+  nb.textContent = net >= 0 ? '+' + fmt(net) : fmt(net);
+  nb.className = 'card-badge ' + (net >= 0 ? 'badge-green' : 'badge-red');
+
+  // Income/Expense
+  document.getElementById('income-total').textContent = fmt(incomes);
+  document.getElementById('expense-total').textContent = fmt(expenses);
+  document.getElementById('net-total').textContent = fmt(net);
+  document.getElementById('net-total').style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
+
+  renderTransactionLists();
+  renderAssetTable('all');
+  renderGoals();
+  saveState();
+}
+
+// ===== ASSETS =====
+let assetFilter = 'all';
+
+function filterAssets(type, el) {
+  assetFilter = type;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderAssetTable(type);
+}
+
+function renderAssetTable(filter) {
+  const tbody = document.getElementById('asset-tbody');
+  const filtered = filter === 'all' ? state.assets : state.assets.filter(a => a.type === filter);
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">資産データがありません</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((a, i) => {
+    const idx = state.assets.indexOf(a);
+    return `<tr>
+      <td><strong style="font-weight:500;color:var(--text)">${a.name}</strong></td>
+      <td><span class="asset-type-badge ${typeBadgeClass(a.type)}">${typeLabel(a.type)}</span></td>
+      <td class="amount-cell">${fmt(a.amount)}</td>
+      <td class="amount-cell hide-mobile" style="color:${a.yield >= 0 ? 'var(--green)' : 'var(--red)'}">${a.yield !== undefined ? (a.yield >= 0 ? '+' : '') + a.yield + '%' : '—'}</td>
+      <td style="text-align:center;display:flex;gap:0.4rem;justify-content:center">
+        <button class="btn btn-ghost" style="font-size:0.72rem;padding:0.25rem 0.6rem" onclick="editAsset(${idx})">編集</button>
+        <button class="btn btn-danger" style="font-size:0.72rem;padding:0.25rem 0.6rem" onclick="deleteAsset(${idx})">削除</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openAssetModal(editIdx) {
+  state.editingAsset = editIdx !== undefined ? editIdx : null;
+  document.getElementById('asset-modal-title').textContent = editIdx !== undefined ? '資産を編集' : '資産を追加';
+  if (editIdx !== undefined) {
+    const a = state.assets[editIdx];
+    document.getElementById('asset-name').value = a.name;
+    document.getElementById('asset-type').value = a.type;
+    document.getElementById('asset-amount').value = a.amount;
+    document.getElementById('asset-yield').value = a.yield || '';
+  } else {
+    document.getElementById('asset-name').value = '';
+    document.getElementById('asset-type').value = 'cash';
+    document.getElementById('asset-amount').value = '';
+    document.getElementById('asset-yield').value = '';
+  }
+  document.getElementById('asset-modal').classList.add('open');
+}
+
+function editAsset(idx) { openAssetModal(idx); }
+
+function deleteAsset(idx) {
+  if (confirm('この資産を削除しますか？')) {
+    state.assets.splice(idx, 1);
+    updateAll();
+    if (document.querySelector('#page-dashboard').classList.contains('active')) renderCharts();
+  }
+}
+
+function saveAsset() {
+  const name = document.getElementById('asset-name').value.trim();
+  const type = document.getElementById('asset-type').value;
+  const amount = parseFloat(document.getElementById('asset-amount').value) || 0;
+  const yld = parseFloat(document.getElementById('asset-yield').value) || 0;
+  if (!name) return alert('資産名を入力してください');
+
+  const asset = { name, type, amount, yield: yld };
+  if (state.editingAsset !== null) {
+    state.assets[state.editingAsset] = asset;
+  } else {
+    state.assets.push(asset);
+  }
+  closeModal('asset-modal');
+  updateAll();
+  renderCharts();
+}
+
+// ===== TRANSACTIONS =====
+function openTxModal(type) {
+  state.txType = type;
+  document.getElementById('tx-modal-title').textContent = type === 'income' ? '収入を追加' : '支出を追加';
+  document.getElementById('tx-name').value = '';
+  document.getElementById('tx-amount').value = '';
+  document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('tx-modal').classList.add('open');
+}
+
+function saveTx() {
+  const name = document.getElementById('tx-name').value.trim();
+  const amount = parseFloat(document.getElementById('tx-amount').value) || 0;
+  const date = document.getElementById('tx-date').value;
+  if (!name || !amount) return alert('内容と金額を入力してください');
+  state.transactions.push({ name, amount, date, type: state.txType });
+  closeModal('tx-modal');
+  updateAll();
+}
+
+function renderTransactionLists() {
+  const incomes = state.transactions.filter(t => t.type === 'income');
+  const expenses = state.transactions.filter(t => t.type === 'expense');
+
+  const renderList = (items, containerId) => {
+    const el = document.getElementById(containerId);
+    if (!items.length) { el.innerHTML = '<div class="empty-state" style="padding:1rem">記録なし</div>'; return; }
+    el.innerHTML = items.slice().reverse().map((t, i) => `
+      <div class="transaction-item">
+        <div>
+          <div class="tx-name">${t.name}</div>
+          <div class="tx-date">${t.date}</div>
+        </div>
+        <div class="tx-amount" style="color:${t.type === 'income' ? 'var(--green)' : 'var(--red)'}">${fmt(t.amount)}</div>
+      </div>
+    `).join('');
+  };
+
+  renderList(incomes, 'income-list');
+  renderList(expenses, 'expense-list');
+}
+
+// ===== GOALS =====
+function openGoalModal() {
+  document.getElementById('goal-name').value = '';
+  document.getElementById('goal-target').value = '';
+  document.getElementById('goal-current').value = '';
+  document.getElementById('goal-deadline').value = '';
+  document.getElementById('goal-modal').classList.add('open');
+}
+
+function saveGoal() {
+  const name = document.getElementById('goal-name').value.trim();
+  const target = parseFloat(document.getElementById('goal-target').value) || 0;
+  const current = parseFloat(document.getElementById('goal-current').value) || 0;
+  const deadline = document.getElementById('goal-deadline').value;
+  if (!name || !target) return alert('目標名と金額を入力してください');
+  state.goals.push({ name, target, current, deadline });
+  closeModal('goal-modal');
+  renderGoals();
+  saveState();
+}
+
+function renderGoals() {
+  const grid = document.getElementById('goals-grid');
+  if (!state.goals.length) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1">目標がありません<br>「＋ 目標を追加」から設定してください</div>';
+    return;
+  }
+  grid.innerHTML = state.goals.map((g, i) => {
+    const pct = Math.min(100, Math.round(g.current / g.target * 100));
+    const daysLeft = g.deadline ? Math.ceil((new Date(g.deadline) - new Date()) / 86400000) : null;
+    return `
+      <div class="goal-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div class="goal-name">${g.name}</div>
+          <button class="btn btn-danger" style="font-size:0.7rem;padding:0.2rem 0.5rem" onclick="deleteGoal(${i})">×</button>
+        </div>
+        <div class="goal-target">目標: ${fmt(g.target)}</div>
+        <div class="goal-progress-bar">
+          <div class="goal-progress-fill" style="width:${pct}%"></div>
+        </div>
+        <div class="goal-pct">${pct}%</div>
+        <div class="goal-current">${fmt(g.current)}</div>
+        ${g.deadline ? `<div class="goal-deadline">期限: ${g.deadline}${daysLeft !== null ? ` (あと${daysLeft}日)` : ''}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function deleteGoal(idx) {
+  if (confirm('この目標を削除しますか？')) {
+    state.goals.splice(idx, 1);
+    renderGoals();
+    saveState();
+  }
+}
+
+// ===== MODAL =====
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// Close on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+});
+
+// ===== CHARTS =====
+let charts = {};
+
+function renderCharts() {
+  const { cash, stock, crypto } = getTotals();
+
+  // Donut
+  if (charts.donut) charts.donut.destroy();
+  charts.donut = new Chart(document.getElementById('donutChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['現金・預金', '株式・投資信託', '仮想通貨'],
+      datasets: [{
+        data: [cash, stock, crypto],
+        backgroundColor: ['rgba(90,158,240,0.8)', 'rgba(78,207,138,0.8)', 'rgba(155,127,232,0.8)'],
+        borderColor: '#12121a',
+        borderWidth: 3,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#7a7a9a', font: { size: 11 }, padding: 16, boxWidth: 12 } }
+      },
+      cutout: '65%'
+    }
+  });
+
+  // Line chart (monthly)
+  const months = ['10月', '11月', '12月', '1月', '2月', '今月'];
+  const incomeData = [280000, 310000, 295000, 320000, 305000,
+    state.transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)];
+  const expenseData = [180000, 220000, 260000, 195000, 210000,
+    state.transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)];
+
+  if (charts.line) charts.line.destroy();
+  charts.line = new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: [
+        {
+          label: '収入',
+          data: incomeData,
+          borderColor: 'rgba(78,207,138,0.8)',
+          backgroundColor: 'rgba(78,207,138,0.05)',
+          tension: 0.4, fill: true, pointRadius: 3, pointBackgroundColor: 'rgba(78,207,138,0.9)'
+        },
+        {
+          label: '支出',
+          data: expenseData,
+          borderColor: 'rgba(239,90,111,0.8)',
+          backgroundColor: 'rgba(239,90,111,0.05)',
+          tension: 0.4, fill: true, pointRadius: 3, pointBackgroundColor: 'rgba(239,90,111,0.9)'
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#7a7a9a', font: { size: 11 } } } },
+      scales: {
+        x: { grid: { color: 'rgba(42,42,61,0.5)' }, ticks: { color: '#7a7a9a' } },
+        y: { grid: { color: 'rgba(42,42,61,0.5)' }, ticks: { color: '#7a7a9a', callback: v => '¥' + (v/10000).toFixed(0) + '万' } }
+      }
+    }
+  });
+
+  // Bar
+  if (charts.bar) charts.bar.destroy();
+  charts.bar = new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: ['現金・預金', '株式・投資信託', '仮想通貨'],
+      datasets: [{
+        label: '資産額',
+        data: [cash, stock, crypto],
+        backgroundColor: ['rgba(90,158,240,0.6)', 'rgba(78,207,138,0.6)', 'rgba(155,127,232,0.6)'],
+        borderColor: ['rgba(90,158,240,1)', 'rgba(78,207,138,1)', 'rgba(155,127,232,1)'],
+        borderWidth: 1,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#7a7a9a' } },
+        y: { grid: { color: 'rgba(42,42,61,0.5)' }, ticks: { color: '#7a7a9a', callback: v => '¥' + (v/10000).toFixed(0) + '万' } }
+      }
+    }
+  });
+}
+
+// ===== INIT =====
+loadState();
+updateAll();
+renderCharts();
+
+// Set today's date in modals
+document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+
+// ===== PWA: Service Worker登録 =====
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.warn('SW registration failed:', err));
+  });
+}
+
+// ===== PWA: インストールバナー =====
+let deferredPrompt = null;
+const installBanner = document.getElementById('pwa-install-banner');
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  if (installBanner) installBanner.style.display = 'flex';
+});
+
+function installPWA() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(result => {
+    if (result.outcome === 'accepted') {
+      if (installBanner) installBanner.style.display = 'none';
+    }
+    deferredPrompt = null;
+  });
+}
+
+function dismissInstallBanner() {
+  if (installBanner) installBanner.style.display = 'none';
+}
+
+window.addEventListener('appinstalled', () => {
+  if (installBanner) installBanner.style.display = 'none';
+  deferredPrompt = null;
+});
+
+// ===== IMPORT / AI PARSING =====
+let importParsedData = { assets: [], transactions: [] };
+
+// Cost tracking — Sonnet 4: $3/MTok input, $15/MTok output
+const PRICE_INPUT_PER_TOKEN  = 3  / 1_000_000;   // $0.000003
+const PRICE_OUTPUT_PER_TOKEN = 15 / 1_000_000;   // $0.000015
+const JPY_RATE = 150; // approximate $/¥ rate
+let sessionCostUSD = 0;
+
+function calcCost(inputTokens, outputTokens) {
+  return inputTokens * PRICE_INPUT_PER_TOKEN + outputTokens * PRICE_OUTPUT_PER_TOKEN;
+}
+
+function showCostPanel(inputTokens, outputTokens) {
+  const callCost = calcCost(inputTokens, outputTokens);
+  sessionCostUSD += callCost;
+
+  const fmtUSD = v => '$' + v.toFixed(6);
+  const fmtJPY = v => '≈ ¥' + (v * JPY_RATE).toFixed(2);
+
+  document.getElementById('cost-input-tokens').textContent  = inputTokens.toLocaleString();
+  document.getElementById('cost-output-tokens').textContent = outputTokens.toLocaleString();
+  document.getElementById('cost-this-call').textContent     = fmtUSD(callCost);
+  document.getElementById('cost-this-call-yen').textContent = fmtJPY(callCost);
+  document.getElementById('cost-cumulative').textContent    = fmtUSD(sessionCostUSD);
+  document.getElementById('cost-cumulative-yen').textContent= fmtJPY(sessionCostUSD);
+  document.getElementById('cost-panel').style.display = 'block';
+}
+
+// Update navigate to handle import page
+const _origNavigate = navigate;
+
+// Drag and drop on import zone
+const dropZone = document.getElementById('import-drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) processImportFile(file);
+});
+
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file) processImportFile(file);
+  e.target.value = '';
+}
+
+async function processImportFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  showImportStatus('解析中...', `"${file.name}" を読み取っています`);
+  document.getElementById('import-guide').style.display = 'none';
+  document.getElementById('import-preview').style.display = 'none';
+
+  try {
+    let content = '';
+    let messages = [];
+
+    if (ext === 'csv') {
+      content = await file.text();
+      messages = [{ role: 'user', content: [
+        { type: 'text', text: `以下は金融データのCSVファイルです。資産データ（口座名・種別・残高）と収支データ（日付・内容・金額・収入か支出か）を抽出してJSON形式のみで返してください。フォーマット:\n{"assets":[{"name":"名称","type":"cash|stock|crypto","amount":数値}],"transactions":[{"name":"内容","amount":数値,"date":"YYYY-MM-DD","type":"income|expense"}]}\n\nCSV:\n${content.slice(0, 8000)}` }
+      ]}];
+    } else if (ext === 'pdf' || ext === 'png' || ext === 'jpg' || ext === 'jpeg') {
+      const base64 = await fileToBase64(file);
+      const mediaType = ext === 'pdf' ? 'application/pdf' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+      const contentBlocks = [
+        { type: 'text', text: `これは金融ファイル（通帳・明細・証券・クレジット）です。資産データと収支データを抽出してJSON形式のみで返してください。フォーマット:\n{"assets":[{"name":"名称","type":"cash|stock|crypto","amount":数値}],"transactions":[{"name":"内容","amount":数値,"date":"YYYY-MM-DD","type":"income|expense"}]}\n金額はすべて円（整数）。読み取れない項目は省略。` }
+      ];
+      if (ext === 'pdf') {
+        contentBlocks.push({ type: 'document', source: { type: 'base64', media_type: mediaType, data: base64 } });
+      } else {
+        contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } });
+      }
+      messages = [{ role: 'user', content: contentBlocks }];
+    } else {
+      showImportError('対応していないファイル形式です（PDF・CSV・PNG・JPGのみ）');
+      return;
+    }
+
+    // sessionStorageからAPIキーを取得
+    const apiKey = sessionStorage.getItem('fortuna_api_key') || '';
+    if (!apiKey) {
+      showImportError('APIキーが設定されていません。「🔐 Anthropic APIキー」欄から設定してください。');
+      return;
+    }
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages
+      })
+    });
+
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    const data = await response.json();
+    const text = data.content?.map(b => b.text || '').join('') || '';
+
+    // Show token usage & cost
+    const usage = data.usage || {};
+    showCostPanel(usage.input_tokens || 0, usage.output_tokens || 0);
+
+    // Extract JSON from response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('JSONデータが見つかりませんでした');
+    const parsed = JSON.parse(jsonMatch[0]);
+    importParsedData = { assets: parsed.assets || [], transactions: parsed.transactions || [] };
+
+    if (!importParsedData.assets.length && !importParsedData.transactions.length) {
+      showImportError('データが読み取れませんでした。別のファイルをお試しください。');
+      return;
+    }
+
+    showImportStatus('解析完了', `${importParsedData.assets.length}件の資産、${importParsedData.transactions.length}件の収支を検出`, true);
+    setTimeout(showImportPreview, 600);
+
+  } catch (err) {
+    showImportError('解析エラー: ' + err.message);
+  }
+}
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = () => rej(new Error('ファイル読み込みエラー'));
+    r.readAsDataURL(file);
+  });
+}
+
+function showImportStatus(title, sub, done = false) {
+  const el = document.getElementById('import-status');
+  el.style.display = 'flex';
+  document.getElementById('import-status-title').textContent = title;
+  document.getElementById('import-status-sub').textContent = sub;
+  const icon = document.getElementById('import-status-icon');
+  icon.textContent = done ? '✓' : '⟳';
+  icon.className = 'import-status-icon' + (done ? ' done' : '');
+  icon.style.color = done ? 'var(--green)' : 'var(--gold)';
+}
+
+function showImportError(msg) {
+  const el = document.getElementById('import-status');
+  el.style.display = 'flex';
+  document.getElementById('import-status-title').textContent = 'エラー';
+  document.getElementById('import-status-sub').textContent = msg;
+  const icon = document.getElementById('import-status-icon');
+  icon.textContent = '✕';
+  icon.className = 'import-status-icon done';
+  icon.style.color = 'var(--red)';
+  document.getElementById('import-guide').style.display = '';
+}
+
+function showImportPreview() {
+  const preview = document.getElementById('import-preview');
+  preview.style.display = 'block';
+
+  // Assets
+  const assetSection = document.getElementById('import-preview-assets');
+  const assetList = document.getElementById('import-assets-list');
+  if (importParsedData.assets.length) {
+    assetSection.style.display = 'block';
+    assetList.innerHTML = importParsedData.assets.map((a, i) => `
+      <div class="import-check-item">
+        <input type="checkbox" id="imp-a-${i}" checked>
+        <div class="import-item-info">
+          <div class="import-item-name">${a.name}</div>
+          <div class="import-item-meta">${{ cash: '現金・預金', stock: '株式・投資信託', crypto: '仮想通貨' }[a.type] || a.type}</div>
+        </div>
+        <div class="import-item-amount" style="color:var(--gold-light)">${fmt(a.amount)}</div>
+        <div class="import-item-badge">
+          <span class="asset-type-badge ${typeBadgeClass(a.type)}">${{cash:'現金',stock:'株式',crypto:'仮想通貨'}[a.type]||a.type}</span>
+        </div>
+      </div>
+    `).join('');
+  } else {
+    assetSection.style.display = 'none';
+  }
+
+  // Transactions
+  const txSection = document.getElementById('import-preview-transactions');
+  const txList = document.getElementById('import-tx-list');
+  if (importParsedData.transactions.length) {
+    txSection.style.display = 'block';
+    txList.innerHTML = importParsedData.transactions.map((t, i) => `
+      <div class="import-check-item">
+        <input type="checkbox" id="imp-t-${i}" checked>
+        <div class="import-item-info">
+          <div class="import-item-name">${t.name}</div>
+          <div class="import-item-meta">${t.date || '日付不明'}</div>
+        </div>
+        <div class="import-item-amount" style="color:${t.type === 'income' ? 'var(--green)' : 'var(--red)'}">
+          ${t.type === 'income' ? '+' : '-'}${fmt(t.amount)}
+        </div>
+        <div class="import-item-badge">
+          <span style="font-size:0.65rem;padding:0.2rem 0.5rem;border-radius:3px;${t.type === 'income' ? 'background:rgba(78,207,138,0.12);color:var(--green)' : 'background:rgba(239,90,111,0.12);color:var(--red)'}">
+            ${t.type === 'income' ? '収入' : '支出'}
+          </span>
+        </div>
+      </div>
+    `).join('');
+  } else {
+    txSection.style.display = 'none';
+  }
+}
+
+function confirmImport() {
+  let addedAssets = 0, addedTx = 0;
+
+  importParsedData.assets.forEach((a, i) => {
+    if (document.getElementById(`imp-a-${i}`)?.checked) {
+      state.assets.push(a);
+      addedAssets++;
+    }
+  });
+
+  importParsedData.transactions.forEach((t, i) => {
+    if (document.getElementById(`imp-t-${i}`)?.checked) {
+      state.transactions.push(t);
+      addedTx++;
+    }
+  });
+
+  updateAll();
+  resetImport();
+  alert(`✓ 取り込み完了\n資産: ${addedAssets}件 / 収支: ${addedTx}件 を追加しました`);
+  navigate('dashboard');
+}
+
+function resetImport() {
+  document.getElementById('import-status').style.display = 'none';
+  document.getElementById('import-preview').style.display = 'none';
+  document.getElementById('cost-panel').style.display = 'none';
+  document.getElementById('import-guide').style.display = '';
+  importParsedData = { assets: [], transactions: [] };
+}
+
+// ===== APIキー管理（sessionStorage） =====
+function initApiKeyPanel() {
+  const key = sessionStorage.getItem('fortuna_api_key') || '';
+  renderApiKeyUI(!!key);
+}
+
+function renderApiKeyUI(hasKey) {
+  const badge  = document.getElementById('apikey-badge');
+  const form   = document.getElementById('apikey-form');
+  const saved  = document.getElementById('apikey-saved');
+  if (!badge) return;
+  if (hasKey) {
+    badge.textContent = '設定済み';
+    badge.className = 'apikey-badge apikey-badge-set';
+    form.style.display  = 'none';
+    saved.style.display = 'flex';
+  } else {
+    badge.textContent = '未設定';
+    badge.className = 'apikey-badge apikey-badge-unset';
+    form.style.display  = 'block';
+    saved.style.display = 'none';
+  }
+}
+
+function saveApiKey() {
+  const input = document.getElementById('apikey-input');
+  const key = input.value.trim();
+  if (!key) { alert('APIキーを入力してください'); return; }
+  if (!key.startsWith('sk-ant-')) {
+    alert('APIキーは「sk-ant-」で始まる形式です。\nhttps://console.anthropic.com で取得できます。');
+    return;
+  }
+  // sessionStorageに保存（タブを閉じると自動消去）
+  sessionStorage.setItem('fortuna_api_key', key);
+  input.value = '';
+  renderApiKeyUI(true);
+}
+
+function editApiKey() {
+  document.getElementById('apikey-form').style.display = 'block';
+  document.getElementById('apikey-saved').style.display = 'none';
+  document.getElementById('apikey-input').focus();
+}
+
+function clearApiKey() {
+  if (!confirm('APIキーを削除しますか？\nAIインポート機能が使えなくなります。')) return;
+  sessionStorage.removeItem('fortuna_api_key');
+  renderApiKeyUI(false);
+}
+
+// 起動時に状態を反映
+initApiKeyPanel();
+
+// ===== QR SYNC =====
+let recvData = null;
+
+function switchSyncTab(tab) {
+  document.getElementById('stab-send').classList.toggle('active', tab === 'send');
+  document.getElementById('stab-recv').classList.toggle('active', tab === 'recv');
+  document.getElementById('sync-send').style.display = tab === 'send' ? 'block' : 'none';
+  document.getElementById('sync-recv').style.display = tab === 'recv' ? 'block' : 'none';
+}
+
+function generateQR() {
+  // 選択されたデータを収集
+  const payload = {};
+  if (document.getElementById('sync-assets').checked)       payload.assets       = state.assets;
+  if (document.getElementById('sync-transactions').checked) payload.transactions = state.transactions;
+  if (document.getElementById('sync-goals').checked)        payload.goals        = state.goals;
+
+  // 圧縮してBase64エンコード
+  const json    = JSON.stringify(payload);
+  const b64     = btoa(unescape(encodeURIComponent(json)));
+  const syncUrl = location.href.split('?')[0] + '?sync=' + b64;
+
+  // QRに収まるか確認（QRコードの上限は約2953バイト）
+  const sizeError = document.getElementById('sync-size-error');
+  const qrArea    = document.getElementById('sync-qr-area');
+
+  if (syncUrl.length > 2800) {
+    sizeError.style.display = 'block';
+    qrArea.style.display    = 'none';
+    return;
+  }
+
+  sizeError.style.display = 'none';
+  qrArea.style.display    = 'block';
+
+  // QRコード生成
+  const container = document.getElementById('sync-qr-canvas');
+  container.innerHTML = '';
+  new QRCode(container, {
+    text:         syncUrl,
+    width:        220,
+    height:       220,
+    colorDark:    '#0a0a0f',
+    colorLight:   '#ffffff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+
+  // データサイズ表示
+  const assets = payload.assets?.length || 0;
+  const txs    = payload.transactions?.length || 0;
+  const goals  = payload.goals?.length || 0;
+  document.getElementById('sync-data-size').textContent =
+    `資産 ${assets}件 · 収支 ${txs}件 · 目標 ${goals}件 | ${(syncUrl.length/1024).toFixed(1)}KB`;
+}
+
+function importFromUrl() {
+  const raw = document.getElementById('sync-url-input').value.trim();
+  let b64 = '';
+
+  // URLパラメータかそのままBase64か判断
+  try {
+    const url = new URL(raw);
+    b64 = url.searchParams.get('sync') || '';
+  } catch {
+    b64 = raw; // 直接Base64として扱う
+  }
+
+  if (!b64) { alert('有効な同期URLを入力してください'); return; }
+
+  try {
+    const json = decodeURIComponent(escape(atob(b64)));
+    recvData = JSON.parse(json);
+  } catch {
+    alert('データの読み取りに失敗しました。URLが正しいか確認してください。');
+    return;
+  }
+
+  // プレビュー表示
+  const summary = document.getElementById('sync-recv-summary');
+  const lines = [];
+  if (recvData.assets?.length)       lines.push(`◆ 資産データ: ${recvData.assets.length}件`);
+  if (recvData.transactions?.length) lines.push(`◉ 収支記録: ${recvData.transactions.length}件`);
+  if (recvData.goals?.length)        lines.push(`◎ 目標設定: ${recvData.goals.length}件`);
+  summary.innerHTML = lines.map(l => `<div style="margin-bottom:0.3rem">${l}</div>`).join('');
+  document.getElementById('sync-recv-preview').style.display = 'block';
+}
+
+function cancelRecv() {
+  recvData = null;
+  document.getElementById('sync-recv-preview').style.display = 'none';
+  document.getElementById('sync-url-input').value = '';
+}
+
+function applyRecv() {
+  if (!recvData) return;
+  const mode = document.querySelector('input[name="merge-mode"]:checked').value;
+
+  if (mode === 'replace') {
+    if (!confirm('既存のデータをすべて置き換えます。よろしいですか？')) return;
+    if (recvData.assets)       state.assets       = recvData.assets;
+    if (recvData.transactions) state.transactions = recvData.transactions;
+    if (recvData.goals)        state.goals        = recvData.goals;
+  } else {
+    // マージ: 重複を避けて追加
+    if (recvData.assets)       state.assets       = [...state.assets,       ...recvData.assets];
+    if (recvData.transactions) state.transactions = [...state.transactions, ...recvData.transactions];
+    if (recvData.goals)        state.goals        = [...state.goals,        ...recvData.goals];
+  }
+
+  updateAll();
+  cancelRecv();
+  alert('✓ データを取り込みました！');
+  navigate('dashboard');
+}
+
+// QR経由でページを開いた場合、自動的に同期タブを表示
+(function checkSyncOnLoad() {
+  const params = new URLSearchParams(location.search);
+  const syncParam = params.get('sync');
+  if (syncParam) {
+    // 同期ページを開いて受信タブに切り替え
+    setTimeout(() => {
+      navigate('sync');
+      switchSyncTab('recv');
+      document.getElementById('sync-url-input').value = location.href;
+      importFromUrl();
+    }, 500);
+  }
+})();
+</script>
+</body>
+</html>
